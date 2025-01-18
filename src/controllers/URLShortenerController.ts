@@ -4,6 +4,7 @@ import { BaseController } from "./BaseController";
 import { URLShortenerQueries } from "../utils/queries/URLShortenerQueries";
 import { randomBytes } from 'crypto';
 import { UAParser } from 'ua-parser-js';
+import { redisClient } from "../services/RedisClient";
 
 export class URLShortenerController extends BaseController {
     private readonly urlShortenerQueries: URLShortenerQueries;
@@ -65,12 +66,26 @@ export class URLShortenerController extends BaseController {
                 return res.status(400).json({ message: "Alias must be 6 characters long" });
             }
 
-            const fetchLongURL = await this.urlShortenerQueries.execGetLongURL(alias);
-            if (!fetchLongURL.length) {
-                return res.status(404).json({ message: "Alias does not exist" });
+            const cachedLongUrlObject = await redisClient.getValue(alias);
+            let longUrl: string;
+            let urlId: string;
+            if (cachedLongUrlObject) {
+                const cachedObject = JSON.parse(cachedLongUrlObject) as { id: string, long_url: string };
+                urlId = cachedObject.id;
+                longUrl = cachedObject.long_url;
+            } else {
+                const fetchLongURL = await this.urlShortenerQueries.execGetLongURL(alias);
+                if (!fetchLongURL.length) {
+                    return res.status(404).json({ message: "Alias does not exist" });
+                }
+
+                const urlValues: string[] = this.getValues(fetchLongURL);
+                urlId = urlValues[0];
+                longUrl = urlValues[1];
+
+                await redisClient.setKey(alias, urlId, longUrl);
             }
 
-            const urlValues: string[] = this.getValues(fetchLongURL);
             let ip = req.ip!;
             const ua = req.headers['user-agent'];
             const parser = new UAParser(ua);
@@ -81,13 +96,14 @@ export class URLShortenerController extends BaseController {
                 ip = ip.substring(7);
             }
 
-            urlLog.url_id = parseInt(urlValues[0]);
+            urlLog.url_id = parseInt(urlId);
             urlLog.requester_device = device.type ?? "desktop";
             urlLog.requester_ip = ip as string;
             urlLog.requester_os = os.name ?? "unknown";
 
             await this.urlShortenerQueries.execEnterFetchLog(urlLog);
-            return res.status(301).json({ url_id: urlValues[0], long_url: urlValues[1] });
+
+            return res.status(301).json({ url_id: urlId, long_url: longUrl });
         } catch (error) {
             console.error("Error redirecting to long URL:", error);
             return res.status(500).json({ message: "Internal Server Error" });
