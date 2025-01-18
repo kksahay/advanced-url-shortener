@@ -14,73 +14,84 @@ export class URLShortenerController extends BaseController {
     }
 
     async createShortURL(req: Request, res: Response) {
-        const user = req.user;
-        const urlBody = new URLBody(req.body);
+        try {
+            const user = req.user;
+            const urlBody = new URLBody(req.body);
 
-        if (!urlBody.topic) {
-            urlBody.topic = "NA";
-        }
+            if (!urlBody.topic) {
+                urlBody.topic = "NA";
+            }
 
-        if (!urlBody.custom_alias) {
-            const customAlias = this.generateBase62Alias();
-            urlBody.custom_alias = customAlias;
-        } else if (urlBody.custom_alias.length !== 6) {
-            return res.status(400).send({ message: "Alias length should be 6." });
-        }
+            if (!urlBody.custom_alias) {
+                urlBody.custom_alias = this.generateBase62Alias();
+            } else if (urlBody.custom_alias.length !== 6) {
+                return res.status(400).json({ message: "Alias length should be 6." });
+            }
 
-        const checkExistingAlias = await this.urlShortenerQueries.execCheckExistingAlias(urlBody.custom_alias);
+            const checkExistingAlias = await this.urlShortenerQueries.execCheckExistingAlias(urlBody.custom_alias);
+            if (checkExistingAlias.length > 0) {
+                return res.status(400).json({ message: "Alias already exists" });
+            }
 
-        if (checkExistingAlias.length > 0) {
-            return res.status(400).json({ message: "Alias already exists" });
-        }
+            const urlResponse = new URLResponse();
 
-        const urlResponse = new URLResponse();
+            const checkExistingLongUrl = await this.urlShortenerQueries.execCheckExistingUrl(urlBody.long_url);
+            if (checkExistingLongUrl.length > 0) {
+                const values = this.getValues(checkExistingLongUrl);
+                urlResponse.url_id = parseInt(values[0]);
+                urlResponse.long_url = values[1];
+                urlResponse.short_url = process.env.SHORT_URL_PREFIX + values[2];
+                return res.status(200).json(urlResponse);
+            }
 
-        const checkExistingLongUrl = await this.urlShortenerQueries.execCheckExistingUrl(urlBody.long_url);
+            const result = await this.urlShortenerQueries.execInsertShortURL(user.user_id, urlBody);
+            const values = this.getValues(result);
 
-        if (checkExistingLongUrl.length > 0) {
-            const values = this.getValues(checkExistingLongUrl);
             urlResponse.url_id = parseInt(values[0]);
             urlResponse.long_url = values[1];
             urlResponse.short_url = process.env.SHORT_URL_PREFIX + values[2];
-            return res.status(200).json(urlResponse);
+
+            return res.status(201).json(urlResponse);
+        } catch (error) {
+            console.error("Error creating short URL:", error);
+            return res.status(500).json({ message: "Internal Server Error" });
         }
-
-        const result = await this.urlShortenerQueries.execInsertShortURL(user.user_id, urlBody);
-
-        const values = this.getValues(result);
-
-        urlResponse.url_id = parseInt(values[0]);
-        urlResponse.long_url = values[1];
-        urlResponse.short_url = process.env.SHORT_URL_PREFIX + values[2];
-
-        return res.status(200).json(urlResponse);
     }
 
     async redirectToLongURL(req: Request, res: Response) {
-        const { alias } = req.params;
-        if (!alias || alias.length !== 6) {
-            return res.status(400).json({ message: "Alias must be 6 characters long" });
+        try {
+            const { alias } = req.params;
+            if (!alias || alias.length !== 6) {
+                return res.status(400).json({ message: "Alias must be 6 characters long" });
+            }
+
+            const fetchLongURL = await this.urlShortenerQueries.execGetLongURL(alias);
+            if (!fetchLongURL.length) {
+                return res.status(404).json({ message: "Alias does not exist" });
+            }
+
+            const urlValues: string[] = this.getValues(fetchLongURL);
+            let ip = req.ip!;
+            const ua = req.headers['user-agent'];
+            const parser = new UAParser(ua);
+            const { device, os } = parser.getResult();
+            const urlLog = new URLLog();
+
+            if (ip.startsWith('::ffff:')) {
+                ip = ip.substring(7);
+            }
+
+            urlLog.url_id = parseInt(urlValues[0]);
+            urlLog.requester_device = device.type ?? "desktop";
+            urlLog.requester_ip = ip as string;
+            urlLog.requester_os = os.name ?? "unknown";
+
+            await this.urlShortenerQueries.execEnterFetchLog(urlLog);
+            return res.status(301).json({ url_id: urlValues[0], long_url: urlValues[1] });
+        } catch (error) {
+            console.error("Error redirecting to long URL:", error);
+            return res.status(500).json({ message: "Internal Server Error" });
         }
-        const fetchLongURL = await this.urlShortenerQueries.execGetLongURL(alias);
-        if (!fetchLongURL.length) {
-            return res.status(400).json({ message: "Alias does not exists" });
-        }
-        const urlValues: string[] = this.getValues(fetchLongURL);
-        let ip = req.ip!;
-        const ua = req.headers['user-agent'];
-        const parser = new UAParser(ua);
-        const { device, os } = parser.getResult();
-        const urlLog = new URLLog();
-        if (ip.startsWith('::ffff:')) {
-            ip = ip.substring(7);
-        }
-        urlLog.url_id = parseInt(urlValues[0]);
-        urlLog.requester_device = device.type ?? "desktop";
-        urlLog.requester_ip = ip as string;
-        urlLog.requester_os = os.name as string ?? "linux";
-        await this.urlShortenerQueries.execEnterFetchLog(urlLog);
-        return res.status(301).json({ url_id: urlValues[0], long_url: urlValues[1] });
     }
 
     private generateBase62Alias(): string {
@@ -93,7 +104,6 @@ export class URLShortenerController extends BaseController {
             result = characters.charAt(remainder) + result;
             randomNumber = Math.floor(randomNumber / 62);
         }
-        result = result.padStart(6, '0').slice(0, 6);
-        return result;
+        return result.padStart(6, '0').slice(0, 6);
     }
 }
