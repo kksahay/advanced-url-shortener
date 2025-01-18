@@ -5,10 +5,10 @@ import { User } from "../types";
 import jwt from "jsonwebtoken";
 
 export class UserController extends BaseController {
-    private client_id: string;
-    private client_secret: string;
-    private redirect_uri: string;
-    private userQueries: UserQueries;
+    private readonly client_id: string;
+    private readonly client_secret: string;
+    private readonly redirect_uri: string;
+    private readonly userQueries: UserQueries;
 
     constructor() {
         super();
