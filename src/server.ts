@@ -8,8 +8,6 @@ declare module "express-serve-static-core" {
     }
 }
 
-
-
 const db = new DatabaseConnection();
 const app = new App(process.env.PORT as string);
 export const sql = db.sql;

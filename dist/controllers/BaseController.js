@@ -1,0 +1,1 @@
+"use strict";Object.defineProperty(exports,"__esModule",{value:true});Object.defineProperty(exports,"BaseController",{enumerable:true,get:function(){return BaseController}});class BaseController{getKeys(results){return Object.keys(results[0])}getValues(results){return Object.values(results[0])}}
