@@ -19,7 +19,7 @@ export class App {
             standardHeaders: true,
             legacyHeaders: false,
         });
-        this.file = fs.readFileSync("swagger.yaml", 'utf8');
+        this.file = fs.readFileSync(process.cwd() + "/swagger.yaml", 'utf8');
         this.swaggerDocument = YAML.parse(this.file);
         this.app.use(express.json());
         this.app.use(cors());

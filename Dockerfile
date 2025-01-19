@@ -5,7 +5,7 @@ ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable
 WORKDIR /usr/src/app
-COPY package.json pnpm-lock.yaml .swcrc /usr/src/app/
+COPY package.json pnpm-lock.yaml .swcrc swagger.yaml /usr/src/app/
 COPY src /usr/src/app/src
 
 FROM base AS prod-deps
@@ -20,6 +20,7 @@ FROM node:22.13.0-bullseye-slim
 USER node
 WORKDIR /usr/src/app
 COPY --chown=node:node --from=base /usr/bin/dumb-init /usr/bin/dumb-init
+COPY --chown=node:node --from=base /usr/src/app/swagger.yaml /usr/src/app/swagger.yaml
 COPY --chown=node:node --from=prod-deps /usr/src/app/node_modules /usr/src/app/node_modules
 COPY --chown=node:node --from=build /usr/src/app/dist /usr/src/app/dist
 CMD ["dumb-init", "node", "dist/server.js"]
