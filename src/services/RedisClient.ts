@@ -4,7 +4,12 @@ export class RedisClient {
     private readonly redisClient: RedisClientType;
 
     constructor() {
-        this.redisClient = createClient();
+        this.redisClient = createClient({
+            socket: {
+                host: "redis",
+                port: 6379,
+            }
+        });
         this.initialize();
     }
 
