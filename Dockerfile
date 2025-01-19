@@ -1,5 +1,5 @@
 #The base image
-FROM node:20.13.1-bullseye AS base
+FROM node:22.13.0-bullseye AS base
 RUN apt-get update && apt-get install -y --no-install-recommends dumb-init
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
@@ -16,7 +16,7 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 RUN pnpm run build
 
 #The prod image
-FROM node:20.13.1-bullseye-slim
+FROM node:22.13.0-bullseye-slim
 USER node
 WORKDIR /usr/src/app
 COPY --chown=node:node --from=base /usr/bin/dumb-init /usr/bin/dumb-init
