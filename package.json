@@ -7,7 +7,7 @@
     "build": "swc src -d dist --config-file .swcrc",
     "start": "node --env-file=.env dist/server.js",
     "dev": "dotenv -- tsx watch src/server.ts",
-    "test": "jest tests/analytics.test.ts"
+    "test": "jest"
   },
   "keywords": [],
   "author": "",
