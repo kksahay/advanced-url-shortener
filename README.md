@@ -19,7 +19,7 @@
    PORT=3000
 
    # Database Configuration
-   DB_URI=postgresql://url_shortener_5sot_user:tP8ltTz2tXEdwvHGznVII4ZrH0leiFYh@dpg-cu4peft2ng1s73fcmaf0-a.singapore-postgres.render.com/url_shortener_5sot
+   DB_URI=
 
    # Google OAuth Configuration
    GOOGLE_CLIENT_ID=
